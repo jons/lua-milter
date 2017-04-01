@@ -1,7 +1,10 @@
-
+function negotiate (envelope)
+  print("negotiate!")
+  return Milter.SMFIS_CONTINUE
+end
 
 function helo (envelope)
-  print("helo")
+  print("helo!")
   print(Milter.SMFIS_CONTINUE, "continue")
   print(Milter.SMFIS_REJECT, "reject")
   print(Milter.SMFIS_DISCARD, "discard")
@@ -9,11 +12,17 @@ function helo (envelope)
   print(Milter.SMFIS_TEMPFAIL, "tempfail")
   print(Milter.SMFIS_NOREPLY, "noreply")
   print(Milter.SMFIS_SKIP, "skip")
-  return 0
+  return Milter.SMFIS_CONTINUE
 end
 
-obj = Milter.start("inet:12345", 0)
+function close (envelope)
+  print(envelope)
+  print("close!")
+  return Milter.SMFIS_CONTINUE
+end
 
-print(obj)
-
-print(obj:connstr())
+milter = Milter.create()
+milter:setConnection("inet:12345")
+milter:setFlags(0)
+--milter:setHELO(helo)
+return milter
