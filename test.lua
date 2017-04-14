@@ -24,5 +24,7 @@ end
 milter = Milter.create()
 milter:setConnection("inet:12345")
 milter:setFlags(0)
---milter:setHELO(helo)
+milter:setNegotiate(negotiate)
+milter:setHELO(helo)
+milter:setClose(close)
 return milter
