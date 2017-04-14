@@ -12,6 +12,20 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
+#define EH_NEGOTIATE  (0)
+#define EH_CONNECT    (1)
+#define EH_UNKNOWN    (2)
+#define EH_HELO       (3)
+#define EH_ENVFROM    (4)
+#define EH_ENVRCPT    (5)
+#define EH_DATA       (6)
+#define EH_HEADER     (7)
+#define EH_EOH        (8)
+#define EH_BODY       (9)
+#define EH_EOM        (10)
+#define EH_ABORT      (11)
+#define EH_CLOSE      (12)
+#define NUMEHRS       (13)//number of event handler references
 
 typedef struct envelope envelope_t;
 typedef struct lmdesc lmdesc_t;
@@ -46,7 +60,89 @@ static const char *Milter_typename = "Milter";
 /**
  */
 lua_State *L;
+int L_refs[NUMEHRS] = { LUA_REFNIL };
 pthread_mutex_t lock_L = PTHREAD_MUTEX_INITIALIZER;
+
+
+/**
+ */
+static int Milter_set_negotiate (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_connect (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_unknown (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_helo (lua_State *S)
+{
+  int r, i, n = lua_gettop(S);
+  if (n < 1)
+  {
+    luaL_error(S, "setHELO: missing argument\n");
+  }
+  else if (!lua_isfunction(S, 1))
+  {
+    luaL_error(S, "setHELO: invalid type %s, function expected\n", luaL_typename(S, 1));
+  }
+  else
+//  if (pthread_mutex_lock(&lock_L))
+    L_refs[EH_HELO] = luaL_ref(S, LUA_REGISTRYINDEX);
+//    pthread_mutex_unlock(&lock_L);
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_set_envfrom (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_envrcpt (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_data (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_header (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_eoh (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_body (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_eom (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_abort (lua_State *S) { return 0; }
+
+
+/**
+ */
+static int Milter_set_close (lua_State *S) { return 0; }
 
 
 /**
@@ -141,6 +237,19 @@ static int luaopen_Milter (lua_State *S)
   {
     { "setConnection", &Milter_set_connstr },
     { "setFlags",      &Milter_set_flags },
+    { "setNegotiate",  &Milter_set_negotiate },
+    { "setConnect",    &Milter_set_connect },
+    { "setUnknown",    &Milter_set_unknown },
+    { "setHELO",       &Milter_set_helo },
+    { "setENVFROM",    &Milter_set_envfrom },
+    { "setENVRCPT",    &Milter_set_envrcpt },
+    { "setDATA",       &Milter_set_data },
+    { "setHeader",     &Milter_set_header },
+    { "setEOH",        &Milter_set_eoh },
+    { "setBody",       &Milter_set_body },
+    { "setEOM",        &Milter_set_eom },
+    { "setAbort",      &Milter_set_abort },
+    { "setClose",      &Milter_set_close },
     { NULL, NULL }
   };
   static const luaL_Reg Milter_libdesc[] =
@@ -185,34 +294,36 @@ static int luaopen_Milter (lua_State *S)
 
 /**
  */
-int fire (lua_State *T, const char *fcall)
+static int trace (lua_State *T)
 {
-  int r;
-  r = lua_getglobal(T, fcall);
-  fprintf(stderr, "fire: lua_getglobal: %d\n", r);
-  // TODO: need a function to create and populate table for envelope param
-  // TODO: a de/serializer would be good
-  lua_newtable(T);
-  // TODO: push the rest of the args for the event
-  r = lua_pcall(T, 1, 1, 0);
-  if (LUA_OK != r)
-  {
-    // TODO: luaL_error in lua instead of in app?
-    //       we need to return, though, and longjmp does not
-    //       might be ok to getglobal again, then lua_getinfo(T, ">S", &a)
-    //       and report a.linedefined since we can't report the return statement lineim
-    fprintf(stderr, "event %s: pcall error, using SMFIS_CONTINUE\n", fcall);
-    r = SMFIS_CONTINUE;
-  }
-  else if (!lua_isnumber(T, 1))
-  {
-    fprintf(stderr, "event %s: invalid result type, using SMFIS_CONTINUE\n", fcall);
-    r = SMFIS_CONTINUE;
-  }
-  else
-    r = lua_tointeger(T, 1);
+  fprintf(stderr, "Error: %s\n", lua_tostring(L, 1));
+  luaL_traceback(L, L, NULL, -1);
+  return 0;
+}
 
-  return r;
+
+/**
+ */
+int fire (lua_State *T, const int ref)
+{
+  int ti, r, retval = SMFIS_CONTINUE;
+  lua_pushcfunction(T, trace);
+  ti = lua_gettop(T);
+  r = lua_rawgeti(T, LUA_REGISTRYINDEX, ref);
+  fprintf(stderr, "fire: lua_getglobal: %d\n", r);
+  if (LUA_TFUNCTION == r)
+  {
+    // TODO: need a function to create and populate table for envelope param
+    // TODO: a de/serializer would be good maybe. maybe just ref it?
+    lua_newtable(T);
+    // TODO: push the rest of the args for the event, set the pcall nargs correctly
+    r = lua_pcall(T, 1, 1, ti);
+    ti = lua_gettop(T);
+    if (LUA_OK == r && lua_isinteger(T, ti))
+      retval = lua_tointeger(T, ti);
+  }
+  lua_pop(T, 2);
+  return retval;
 }
 
 
@@ -226,7 +337,7 @@ sfsistat fi_negotiate (SMFICTX *context,
                            unsigned long *pf2,
                            unsigned long *pf3)
 {
-  int r = SMFIS_ALL_OPTS;
+  int f, r = SMFIS_ALL_OPTS;
   envelope_t *envelope = (envelope_t *)malloc(sizeof(envelope_t));
   smfi_setpriv(context, envelope);
   if (NULL == envelope)
@@ -244,9 +355,9 @@ sfsistat fi_negotiate (SMFICTX *context,
     envelope->T = lua_newthread(L);
     envelope->Tref = luaL_ref(L, LUA_REGISTRYINDEX);
     lua_pop(L, 1);
+    f = L_refs[EH_NEGOTIATE];
     pthread_mutex_unlock(&lock_L);
-
-    r = fire(envelope->T, "negotiate");
+    r = fire(envelope->T, f);
   }
   return r;
 }
@@ -447,9 +558,10 @@ int main (int argc, char **argv)
     return -1;
   }
 
-  r = smfi_main();// blocks until an event or signal handler calls smfi_stop
+  // smfi_main blocks until an event or signal handler calls smfi_stop
+  r = smfi_main();
 
-  // join lua threads before close probably. maybe needs to use the lock
+  // probably don't have to join lua threads before close, but maybe.
   lua_close(L);
 
   return 0;
