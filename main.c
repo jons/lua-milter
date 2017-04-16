@@ -5,6 +5,7 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <pthread.h>
 #include "libmilter/mfapi.h"
@@ -36,6 +37,7 @@ struct envelope
 {
   lua_State *T;
   int Tref;
+  int Eref;
   char sid[2];
 };
 
@@ -51,7 +53,7 @@ struct lmdesc
 
 /**
  */
-const char *g_name = "lua-bindings";
+char *g_name = "lua-bindings";
 
 /**
  */
@@ -81,6 +83,7 @@ static int setwrap (lua_State *S, const char *fcall, const int eh)
 //  if (pthread_mutex_lock(&lock_L))
     L_refs[eh] = luaL_ref(S, LUA_REGISTRYINDEX);
 //    pthread_mutex_unlock(&lock_L);
+  return 0;
 }
 
 
@@ -88,8 +91,7 @@ static int setwrap (lua_State *S, const char *fcall, const int eh)
  */
 static int Milter_set_negotiate (lua_State *S)
 {
-  setwrap(S, "Negotiate", EH_NEGOTIATE);
-  return 0;
+  return setwrap(S, "Negotiate", EH_NEGOTIATE);
 }
 
 
@@ -97,8 +99,7 @@ static int Milter_set_negotiate (lua_State *S)
  */
 static int Milter_set_connect (lua_State *S)
 {
-  setwrap(S, "Connect", EH_CONNECT);
-  return 0;
+  return setwrap(S, "Connect", EH_CONNECT);
 }
 
 
@@ -106,8 +107,7 @@ static int Milter_set_connect (lua_State *S)
  */
 static int Milter_set_unknown (lua_State *S)
 {
-  setwrap(S, "Unknown", EH_UNKNOWN);
-  return 0;
+  return setwrap(S, "Unknown", EH_UNKNOWN);
 }
 
 
@@ -115,8 +115,7 @@ static int Milter_set_unknown (lua_State *S)
  */
 static int Milter_set_helo (lua_State *S)
 {
-  setwrap(S, "HELO", EH_HELO);
-  return 0;
+  return setwrap(S, "HELO", EH_HELO);
 }
 
 
@@ -124,8 +123,7 @@ static int Milter_set_helo (lua_State *S)
  */
 static int Milter_set_envfrom (lua_State *S)
 {
-  setwrap(S, "ENVFROM", EH_ENVFROM);
-  return 0;
+  return setwrap(S, "ENVFROM", EH_ENVFROM);
 }
 
 
@@ -133,8 +131,7 @@ static int Milter_set_envfrom (lua_State *S)
  */
 static int Milter_set_envrcpt (lua_State *S)
 {
-  setwrap(S, "ENVRCPT", EH_ENVRCPT);
-  return 0;
+  return setwrap(S, "ENVRCPT", EH_ENVRCPT);
 }
 
 
@@ -142,8 +139,7 @@ static int Milter_set_envrcpt (lua_State *S)
  */
 static int Milter_set_data (lua_State *S)
 {
-  setwrap(S, "DATA", EH_DATA);
-  return 0;
+  return setwrap(S, "DATA", EH_DATA);
 }
 
 
@@ -151,8 +147,7 @@ static int Milter_set_data (lua_State *S)
  */
 static int Milter_set_header (lua_State *S)
 {
-  setwrap(S, "Header", EH_HEADER);
-  return 0;
+  return setwrap(S, "Header", EH_HEADER);
 }
 
 
@@ -160,8 +155,7 @@ static int Milter_set_header (lua_State *S)
  */
 static int Milter_set_eoh (lua_State *S)
 {
-  setwrap(S, "EOH", EH_EOH);
-  return 0;
+  return setwrap(S, "EOH", EH_EOH);
 }
 
 
@@ -169,8 +163,7 @@ static int Milter_set_eoh (lua_State *S)
  */
 static int Milter_set_body (lua_State *S)
 {
-  setwrap(S, "Body", EH_BODY);
-  return 0;
+  return setwrap(S, "Body", EH_BODY);
 }
 
 
@@ -178,8 +171,7 @@ static int Milter_set_body (lua_State *S)
  */
 static int Milter_set_eom (lua_State *S)
 {
-  setwrap(S, "EOM", EH_EOM);
-  return 0;
+  return setwrap(S, "EOM", EH_EOM);
 }
 
 
@@ -187,8 +179,7 @@ static int Milter_set_eom (lua_State *S)
  */
 static int Milter_set_abort (lua_State *S)
 {
-  setwrap(S, "Abort", EH_ABORT);
-  return 0;
+  return setwrap(S, "Abort", EH_ABORT);
 }
 
 
@@ -196,8 +187,7 @@ static int Milter_set_abort (lua_State *S)
  */
 static int Milter_set_close (lua_State *S)
 {
-  setwrap(S, "Close", EH_CLOSE);
-  return 0;
+  return setwrap(S, "Close", EH_CLOSE);
 }
 
 
@@ -360,23 +350,53 @@ static int trace (lua_State *S)
 
 /**
  */
-int fire (lua_State *T, const int ref)
+int setstack_negotiate (lua_State *T, va_list *ap)
 {
-  int ti, r, retval = SMFIS_CONTINUE;
+  unsigned long f;
+  f = va_arg(*ap, unsigned long);
+  lua_pushinteger(T, f);
+  f = va_arg(*ap, unsigned long);
+  lua_pushinteger(T, f);
+  f = va_arg(*ap, unsigned long);
+  lua_pushinteger(T, f);
+  f = va_arg(*ap, unsigned long);
+  lua_pushinteger(T, f);
+  return 4;
+}
+
+
+/**
+ */
+int fire (lua_State *T, const int ref_fcall, const int ref_env, ...)
+{
+  va_list ap;
+  int ti, r, nargs = 1, retval = SMFIS_CONTINUE;
   lua_pushcfunction(T, trace);
   ti = lua_gettop(T);
-  r = lua_rawgeti(T, LUA_REGISTRYINDEX, ref);
+  r = lua_rawgeti(T, LUA_REGISTRYINDEX, ref_fcall);
   if (LUA_TFUNCTION == r)
   {
-    // TODO: need a function to create and populate table for envelope param
-    // TODO: a de/serializer would be good maybe. maybe just ref it?
-    lua_newtable(T);
-    // TODO: push the rest of the args for the event, set the pcall nargs correctly
-    r = lua_pcall(T, 1, 1, ti);
-    ti = lua_gettop(T);
-    if (LUA_OK == r && lua_isinteger(T, ti))
-      retval = lua_tointeger(T, ti);
+    r = lua_rawgeti(T, LUA_REGISTRYINDEX, ref_env);
+    if (LUA_TTABLE == r)
+    {
+      //
+      va_start(ap, ref_env);
+      //nargs += SS_funcs[EH_NEGOTIATE](T,ap);
+      switch (ref_fcall)
+      {
+        case EH_NEGOTIATE:
+          nargs += setstack_negotiate(T, &ap);
+          break;
+      }
+      va_end(ap);
+      r = lua_pcall(T, nargs, 1, ti);
+      ti = lua_gettop(T);
+      if (LUA_OK == r && lua_isinteger(T, ti))
+        retval = lua_tointeger(T, ti);
+    }
   }
+  // remove the retval/error object pushed by pcall
+  // remove the error handler at ti
   lua_pop(T, 2);
   return retval;
 }
@@ -392,7 +412,7 @@ sfsistat fi_negotiate (SMFICTX *context,
                            unsigned long *pf2,
                            unsigned long *pf3)
 {
-  int f, r = SMFIS_ALL_OPTS;
+  int r = SMFIS_ALL_OPTS;
   envelope_t *envelope = (envelope_t *)malloc(sizeof(envelope_t));
   smfi_setpriv(context, envelope);
   if (NULL == envelope)
@@ -410,11 +430,15 @@ sfsistat fi_negotiate (SMFICTX *context,
     envelope->T = lua_newthread(L);
     envelope->Tref = luaL_ref(L, LUA_REGISTRYINDEX);
     lua_pop(L, 1);
-    f = L_refs[EH_NEGOTIATE];
+    //f = L_refs[EH_NEGOTIATE];
     pthread_mutex_unlock(&lock_L);
 
+    // before firing the event, create the envelope for this session
+    lua_newtable(envelope->T);
+    envelope->Eref = luaL_ref(envelope->T, LUA_REGISTRYINDEX);
+
     fprintf(stderr, "fire(negotiate)\n");
-    r = fire(envelope->T, f);
+    r = fire(envelope->T, L_refs[EH_NEGOTIATE], envelope->Eref, f0, f1, f2, f3);
   }
   return r;
 }
@@ -424,6 +448,8 @@ sfsistat fi_connect (SMFICTX *context, char *host, _SOCK_ADDR *sa)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(connect)\n");
+  r = fire(envelope->T, L_refs[EH_CONNECT], envelope->Eref, host);
   return r;
 }
 
@@ -432,6 +458,8 @@ sfsistat fi_unknown (SMFICTX *context, const char *command)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(unknown)\n");
+  r = fire(envelope->T, L_refs[EH_UNKNOWN], envelope->Eref, command);
   return r;
 }
 
@@ -440,6 +468,8 @@ sfsistat fi_helo (SMFICTX *context, char *helo)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(helo)\n");
+  r = fire(envelope->T, L_refs[EH_HELO], envelope->Eref, helo);
   return r;
 }
 
@@ -448,6 +478,8 @@ sfsistat fi_envfrom (SMFICTX *context, char **argv)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(envfrom)\n");
+  r = fire(envelope->T, L_refs[EH_ENVFROM], envelope->Eref);
   return r;
 }
 
@@ -456,6 +488,8 @@ sfsistat fi_envrcpt (SMFICTX *context, char **argv)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(envrcpt)\n");
+  r = fire(envelope->T, L_refs[EH_ENVRCPT], envelope->Eref);
   return r;
 }
 
@@ -464,6 +498,8 @@ sfsistat fi_data (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(data)\n");
+  r = fire(envelope->T, L_refs[EH_DATA], envelope->Eref);
   return r;
 }
 
@@ -472,6 +508,8 @@ sfsistat fi_header (SMFICTX *context, char *name, char *value)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(header)\n");
+  r = fire(envelope->T, L_refs[EH_HEADER], envelope->Eref, name, value);
   return r;
 }
 
@@ -480,6 +518,8 @@ sfsistat fi_eoh (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(eoh)\n");
+  r = fire(envelope->T, L_refs[EH_EOH], envelope->Eref);
   return r;
 }
 
@@ -488,6 +528,8 @@ sfsistat fi_body (SMFICTX *context, unsigned char *segment, size_t len)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(body)\n");
+  r = fire(envelope->T, L_refs[EH_BODY], envelope->Eref, segment, len);
   return r;
 }
 
@@ -496,6 +538,8 @@ sfsistat fi_eom (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(eom)\n");
+  r = fire(envelope->T, L_refs[EH_EOM], envelope->Eref);
   return r;
 }
 
@@ -504,6 +548,8 @@ sfsistat fi_abort (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  fprintf(stderr, "fire(abort)\n");
+  r = fire(envelope->T, L_refs[EH_ABORT], envelope->Eref);
   return r;
 }
 
@@ -511,16 +557,18 @@ sfsistat fi_abort (SMFICTX *context)
 sfsistat fi_close (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int f = LUA_REFNIL, r = SMFIS_CONTINUE;
-
+  int r = SMFIS_CONTINUE;
+/*
   if (!pthread_mutex_lock(&lock_L))
   {
     f = L_refs[EH_CLOSE];
     pthread_mutex_unlock(&lock_L);
   }
-
+*/
   fprintf(stderr, "fire(close)\n");
-  r = fire(envelope->T, f);
+  r = fire(envelope->T, L_refs[EH_CLOSE], envelope->Eref);
+
+  luaL_unref(envelope->T, LUA_REGISTRYINDEX, envelope->Eref);
 
   if (!pthread_mutex_lock(&lock_L))
   {
