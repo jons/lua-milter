@@ -38,7 +38,6 @@ typedef struct lmdesc lmdesc_t;
  */
 struct envelope
 {
-  char sid[2];
   lua_State *T; // lua thread
   int event;    // the current event
   int Tref;     // ref for thread to keep it alive
@@ -118,7 +117,12 @@ static int Milter_smfi_getsymval (lua_State *S)
     lua_pushliteral(S, "smfi_getsymval: missing argument");
     lua_error(S);
   }
-  //symval = smfi_getsymval(ctx, symname);
+  lua_pushliteral(S, "smfictx");//put this at 3
+  lua_rawget(S, 1);
+  symname = (char *)lua_tostring(S, 2);
+  ctx = (SMFICTX *)lua_topointer(S, 3);
+  symval = smfi_getsymval(ctx, symname);
+  lua_pushstring(S, symval);
   return 1;
 }
 
@@ -362,6 +366,7 @@ static int luaopen_Milter (lua_State *S)
     { "create",      &Milter_create },
     { "version",     &Milter_smfi_version },
     { "setsymlist",  &Milter_smfi_setsymlist },
+    { "getsymval",   &Milter_smfi_getsymval },
     { NULL, NULL }
   };
 

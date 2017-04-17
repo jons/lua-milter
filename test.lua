@@ -6,7 +6,8 @@ function negotiate (envelope, f0, f1, f2, f3)
 end
 
 function helo (envelope)
-  print("[" .. envelope.sid .. "] helo")
+  addr = Milter.getsymval(envelope, "{client_addr}")
+  print("[" .. envelope.sid .. "] helo " .. addr)
   return Milter.SMFIS_CONTINUE
 end
 
