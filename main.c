@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <string.h>
 #include <time.h>
 #include "libmilter/mfapi.h"
 #include "lua.h"
@@ -30,6 +31,8 @@
 #define EH_ABORT      (11)
 #define EH_CLOSE      (12)
 #define NUMEHRS       (13)//number of event handler references
+
+
 
 typedef struct envelope envelope_t;
 typedef struct lmdesc lmdesc_t;
@@ -609,6 +612,7 @@ sfsistat fi_negotiate (SMFICTX *context,
   char ssid[8] = {'\0'};
   int r = SMFIS_ALL_OPTS;
   envelope_t *envelope = (envelope_t *)malloc(sizeof(envelope_t));
+  memset(envelope, 0, sizeof(envelope_t));
   smfi_setpriv(context, envelope);
   if (NULL == envelope)
   {
@@ -624,7 +628,7 @@ sfsistat fi_negotiate (SMFICTX *context,
     // so we create a lua thread here that will service all of its events
     envelope->T = lua_newthread(L);
     envelope->Tref = luaL_ref(L, LUA_REGISTRYINDEX);
-    lua_pop(L, 1);
+    //lua_pop(L, 1);
     //f = L_refs[EH_NEGOTIATE];
     pthread_mutex_unlock(&lock_L);
 

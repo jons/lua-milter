@@ -1,7 +1,8 @@
 function negotiate (envelope, f0, f1, f2, f3)
   print("[" .. envelope.sid .. "] negotiate")
-  r = Milter.setsymlist(envelope, Milter.SMFIM_HELO, "{client_addr}");
-  print("setsymlist: " .. r)
+  r = Milter.setsymlist(envelope, Milter.SMFIM_HELO, "{client_addr}")
+  ret = (Milter.MI_SUCCESS == r and "OK" or "failed")
+  print("setsymlist: " .. ret)
   return Milter.SMFIS_ALL_OPTS
 end
 
