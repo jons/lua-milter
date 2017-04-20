@@ -36,6 +36,7 @@
 
 typedef struct envelope envelope_t;
 typedef struct lmdesc lmdesc_t;
+typedef int (*ss_func_t)(lua_State *, va_list);
 
 /**
  */
@@ -70,6 +71,7 @@ static const char *Milter_typename = "Milter";
 lua_State *L;
 int L_refs[NUMEHRS] = { LUA_REFNIL };
 pthread_mutex_t lock_L = PTHREAD_MUTEX_INITIALIZER;
+ss_func_t SS_funcs[NUMEHRS] = { NULL };
 
 
 /**
@@ -546,45 +548,84 @@ static int trace (lua_State *S)
 
 /**
  */
-int setstack_negotiate (lua_State *T, va_list *ap)
+int setstack_negotiate (lua_State *T, va_list ap)
 {
   unsigned long f;
-  f = va_arg(*ap, unsigned long);
+  f = va_arg(ap, unsigned long);
   lua_pushinteger(T, f);
-  f = va_arg(*ap, unsigned long);
+  f = va_arg(ap, unsigned long);
   lua_pushinteger(T, f);
-  f = va_arg(*ap, unsigned long);
+  f = va_arg(ap, unsigned long);
   lua_pushinteger(T, f);
-  f = va_arg(*ap, unsigned long);
+  f = va_arg(ap, unsigned long);
   lua_pushinteger(T, f);
   return 4;
 }
 
 
 /**
+ * use for connect, unknown, helo
  */
-int fire (lua_State *T, const int ref_fcall, const int ref_env, ...)
+int setstack_1s (lua_State *T, va_list ap)
+{
+  char *s;
+  s = va_arg(ap, char *);
+  lua_pushstring(T, s);
+  return 1;
+}
+
+
+/**
+ * use for header
+ */
+int setstack_2s (lua_State *T, va_list ap)
+{
+  char *s;
+  s = va_arg(ap, char *);
+  lua_pushstring(T, s);
+  s = va_arg(ap, char *);
+  lua_pushstring(T, s);
+  return 2;
+}
+
+
+/**
+ */
+int setstack_body (lua_State *T, va_list ap)
+{
+  unsigned char *data;
+  size_t len;
+  data = va_arg(ap, unsigned char *);
+  len = va_arg(ap, size_t);
+  lua_pushlstring(T, (const char *)data, len); // XXX: juggling sign might not be ok
+  lua_pushinteger(T, len);
+  return 2;
+}
+
+
+/**
+ */
+int fire (lua_State *T, const int event, const int ref_env, ...)
 {
   va_list ap;
   int ti, r, nargs = 1, retval = SMFIS_CONTINUE;
+  ss_func_t setstack;
+
   lua_pushcfunction(T, trace);
   ti = lua_gettop(T);
-  r = lua_rawgeti(T, LUA_REGISTRYINDEX, ref_fcall);
+  r = lua_rawgeti(T, LUA_REGISTRYINDEX, L_refs[event]);
   if (LUA_TFUNCTION == r)
   {
     r = lua_rawgeti(T, LUA_REGISTRYINDEX, ref_env);
     if (LUA_TTABLE == r)
     {
-      //
-      va_start(ap, ref_env);
-      //nargs += SS_funcs[EH_NEGOTIATE](T,ap);
-      switch (ref_fcall)
+      setstack = SS_funcs[event];
+      if (setstack)
       {
-        case EH_NEGOTIATE:
-          nargs += setstack_negotiate(T, &ap);
-          break;
+        va_start(ap, ref_env);
+        nargs += (*setstack)(T, ap);
+        va_end(ap);
       }
-      va_end(ap);
       r = lua_pcall(T, nargs, 1, ti);
       ti = lua_gettop(T);
       if (LUA_OK == r && lua_isinteger(T, ti))
@@ -643,7 +684,7 @@ sfsistat fi_negotiate (SMFICTX *context,
     lua_rawset(envelope->T, -3);
     envelope->Eref = luaL_ref(envelope->T, LUA_REGISTRYINDEX);
 
-    r = fire(envelope->T, L_refs[EH_NEGOTIATE], envelope->Eref, f0, f1, f2, f3);
+    r = fire(envelope->T, EH_NEGOTIATE, envelope->Eref, f0, f1, f2, f3);
   }
   return r;
 }
@@ -653,7 +694,7 @@ sfsistat fi_connect (SMFICTX *context, char *host, _SOCK_ADDR *sa)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_CONNECT], envelope->Eref, host);
+  r = fire(envelope->T, EH_CONNECT, envelope->Eref, host);
   return r;
 }
 
@@ -662,7 +703,7 @@ sfsistat fi_unknown (SMFICTX *context, const char *command)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_UNKNOWN], envelope->Eref, command);
+  r = fire(envelope->T, EH_UNKNOWN, envelope->Eref, command);
   return r;
 }
 
@@ -671,7 +712,7 @@ sfsistat fi_helo (SMFICTX *context, char *helo)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_HELO], envelope->Eref, helo);
+  r = fire(envelope->T, EH_HELO, envelope->Eref, helo);
   return r;
 }
 
@@ -680,7 +721,7 @@ sfsistat fi_envfrom (SMFICTX *context, char **argv)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_ENVFROM], envelope->Eref);
+  r = fire(envelope->T, EH_ENVFROM, envelope->Eref);
   return r;
 }
 
@@ -689,7 +730,7 @@ sfsistat fi_envrcpt (SMFICTX *context, char **argv)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_ENVRCPT], envelope->Eref);
+  r = fire(envelope->T, EH_ENVRCPT, envelope->Eref);
   return r;
 }
 
@@ -698,7 +739,7 @@ sfsistat fi_data (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_DATA], envelope->Eref);
+  r = fire(envelope->T, EH_DATA, envelope->Eref);
   return r;
 }
 
@@ -707,7 +748,7 @@ sfsistat fi_header (SMFICTX *context, char *name, char *value)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_HEADER], envelope->Eref, name, value);
+  r = fire(envelope->T, EH_HEADER, envelope->Eref, name, value);
   return r;
 }
 
@@ -716,7 +757,7 @@ sfsistat fi_eoh (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_EOH], envelope->Eref);
+  r = fire(envelope->T, EH_EOH, envelope->Eref);
   return r;
 }
 
@@ -725,7 +766,7 @@ sfsistat fi_body (SMFICTX *context, unsigned char *segment, size_t len)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_BODY], envelope->Eref, segment, len);
+  r = fire(envelope->T, EH_BODY, envelope->Eref, segment, len);
   return r;
 }
 
@@ -734,7 +775,7 @@ sfsistat fi_eom (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_EOM], envelope->Eref);
+  r = fire(envelope->T, EH_EOM, envelope->Eref);
   return r;
 }
 
@@ -743,7 +784,7 @@ sfsistat fi_abort (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, L_refs[EH_ABORT], envelope->Eref);
+  r = fire(envelope->T, EH_ABORT, envelope->Eref);
   return r;
 }
 
@@ -759,7 +800,7 @@ sfsistat fi_close (SMFICTX *context)
     pthread_mutex_unlock(&lock_L);
   }
 */
-  r = fire(envelope->T, L_refs[EH_CLOSE], envelope->Eref);
+  r = fire(envelope->T, EH_CLOSE, envelope->Eref);
 
   luaL_unref(envelope->T, LUA_REGISTRYINDEX, envelope->Eref);
 
@@ -781,7 +822,14 @@ int main (int argc, char **argv)
   struct smfiDesc desc;
   int r;
 
+  SS_funcs[EH_NEGOTIATE] = setstack_negotiate;
+  SS_funcs[EH_CONNECT]   = setstack_1s;
+  SS_funcs[EH_UNKNOWN]   = setstack_1s;
+  SS_funcs[EH_HELO]      = setstack_1s;
+  SS_funcs[EH_HEADER]    = setstack_2s;
+  SS_funcs[EH_BODY]      = setstack_body;
   srand(time(NULL));
+
   if (argc < 2)
   {
     fprintf(stderr, "usage: %s <script>\n", argv[0]);
