@@ -42,4 +42,5 @@ print(Milter.SMFIS_ACCEPT, "accept")
 print(Milter.SMFIS_TEMPFAIL, "tempfail")
 print(Milter.SMFIS_NOREPLY, "noreply")
 print(Milter.SMFIS_SKIP, "skip")
+print(Milter.SMFI_VERSION)
 return milter

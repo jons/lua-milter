@@ -89,6 +89,17 @@ static int Milter_smfi_version (lua_State *S)
 
 /**
  */
+static SMFICTX *unwrap_envelope (lua_State *S, int top)
+{
+  SMFICTX *ctx;
+  lua_pushliteral("smfictx");
+  lua_rawget(S, 1);
+  return (SMFICTX *)lua_topointer(S, top);
+}
+
+
+/**
+ */
 static int Milter_smfi_setsymlist (lua_State *S)
 {
   SMFICTX *ctx;
@@ -99,11 +110,9 @@ static int Milter_smfi_setsymlist (lua_State *S)
     lua_pushliteral(S, "smfi_setsymlist: missing argument");
     lua_error(S);
   }
-  lua_pushliteral(S, "smfictx");//put this at 4
-  lua_rawget(S, 1);
+  ctx = unwrap_envelope(S, n+1);
   stage = lua_tointeger(S, 2);
   macros = (char *)lua_tostring(S, 3);
-  ctx = (SMFICTX *)lua_topointer(S, 4);
   r = smfi_setsymlist(ctx, stage, macros);
   lua_pushinteger(S, r);
   return 1;
@@ -122,10 +131,8 @@ static int Milter_smfi_getsymval (lua_State *S)
     lua_pushliteral(S, "smfi_getsymval: missing argument");
     lua_error(S);
   }
-  lua_pushliteral(S, "smfictx");//put this at 3
-  lua_rawget(S, 1);
+  ctx = unwrap_envelope(S, n+1);
   symname = (char *)lua_tostring(S, 2);
-  ctx = (SMFICTX *)lua_topointer(S, 3);
   symval = smfi_getsymval(ctx, symname);
   lua_pushstring(S, symval);
   return 1;
@@ -136,7 +143,21 @@ static int Milter_smfi_getsymval (lua_State *S)
  */
 static int Milter_smfi_setreply (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  char *rcode, *xcode, *message;
+  int r, n = lua_gettop(S);
+  if (n < 4)
+  {
+    lua_pushliteral(S, "smfi_setreply: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  rcode = (char *)lua_tostring(S, 2);
+  xcode = (char *)lua_tostring(S, 3);
+  message = (char *)lua_tostring(S, 4);
+  r = smfi_setreply(ctx, rcode, xcode, message);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
@@ -144,6 +165,7 @@ static int Milter_smfi_setreply (lua_State *S)
  */
 static int Milter_smfi_setmlreply (lua_State *S)
 {
+  // TODO: libffi or va_list or something?
   return 0;
 }
 
