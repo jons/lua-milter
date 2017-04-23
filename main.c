@@ -133,6 +133,102 @@ static int Milter_smfi_getsymval (lua_State *S)
 
 
 /**
+ */
+static int Milter_smfi_setreply (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_setmlreply (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_addheader (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_chgheader (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_insheader (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_chgfrom (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_addrcpt (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_addrcpt_par (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_delrcpt (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_replacebody (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_progress (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
+ */
+static int Milter_smfi_quarantine (lua_State *S)
+{
+  return 0;
+}
+
+
+/**
  * this wrapper is used by all the set* functions to let the lua user
  * tell this app which functions are their event handlers
  */
@@ -372,6 +468,18 @@ static int luaopen_Milter (lua_State *S)
     { "version",     &Milter_smfi_version },
     { "setsymlist",  &Milter_smfi_setsymlist },
     { "getsymval",   &Milter_smfi_getsymval },
+    { "setreply",    &Milter_smfi_setreply },
+    { "setmlreply",  &Milter_smfi_setmlreply },
+    { "addheader",   &Milter_smfi_addheader },
+    { "chgheader",   &Milter_smfi_chgheader },
+    { "insheader",   &Milter_smfi_insheader },
+    { "chgfrom",     &Milter_smfi_chgfrom },
+    { "addrcpt",     &Milter_smfi_addrcpt },
+    { "addrcpt_par", &Milter_smfi_addrcpt_par },
+    { "delrcpt",     &Milter_smfi_delrcpt },
+    { "replacebody", &Milter_smfi_replacebody },
+    { "progress",    &Milter_smfi_progress },
+    { "quarantine",  &Milter_smfi_quarantine },
     { NULL, NULL }
   };
 
