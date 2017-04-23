@@ -279,7 +279,20 @@ static int Milter_smfi_addrcpt (lua_State *S)
  */
 static int Milter_smfi_addrcpt_par (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  char *rcpt, *args;
+  int r, n = lua_gettop(S);
+  if (n < 3)
+  {
+    lua_pushliteral(S, "smfi_addrcpt_par: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  rcpt = (char *)lua_tostring(S, 2);
+  args = (char *)lua_tostring(S, 3);
+  r = smfi_addrcpt_par(ctx, rcpt, args);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
