@@ -259,7 +259,19 @@ static int Milter_smfi_chgfrom (lua_State *S)
  */
 static int Milter_smfi_addrcpt (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  char *rcpt;
+  int r, n = lua_gettop(S);
+  if (n < 2)
+  {
+    lua_pushliteral(S, "smfi_addrcpt: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  rcpt = (char *)lua_tostring(S, 2);
+  r = smfi_addrcpt(ctx, rcpt);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
