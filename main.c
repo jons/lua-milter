@@ -199,7 +199,7 @@ static int Milter_smfi_chgheader (lua_State *S)
   int r, hdridx, n = lua_gettop(S);
   if (n < 4)
   {
-    lua_pushliteral(S, "smfi_addheader: missing argument");
+    lua_pushliteral(S, "smfi_chgheader: missing argument");
     lua_error(S);
   }
   ctx = unwrap_envelope(S, n+1);
@@ -216,7 +216,21 @@ static int Milter_smfi_chgheader (lua_State *S)
  */
 static int Milter_smfi_insheader (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  char *headerf, *headerv;
+  int r, hdridx, n = lua_gettop(S);
+  if (n < 4)
+  {
+    lua_pushliteral(S, "smfi_insheader: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  hdridx = lua_tointeger(S, 2);
+  headerf = (char *)lua_tostring(S, 3);
+  headerv = (char *)lua_tostring(S, 4);
+  r = smfi_insheader(ctx, hdridx, headerf, headerv);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
