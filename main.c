@@ -320,7 +320,20 @@ static int Milter_smfi_delrcpt (lua_State *S)
  */
 static int Milter_smfi_replacebody (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  unsigned char *body;
+  int r, len, n = lua_gettop(S);
+  if (n < 3)
+  {
+    lua_pushliteral(S, "smfi_replacebody: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  body = (unsigned char *)lua_tostring(S, 2);
+  len = lua_tointeger(S, 3);
+  r = smfi_replacebody(ctx, body, len);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
