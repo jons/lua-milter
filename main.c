@@ -238,7 +238,20 @@ static int Milter_smfi_insheader (lua_State *S)
  */
 static int Milter_smfi_chgfrom (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  char *mail, *args;
+  int r, n = lua_gettop(S);
+  if (n < 3)
+  {
+    lua_pushliteral(S, "smfi_chgfrom: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  mail = (char *)lua_tostring(S, 2);
+  args = (char *)lua_tostring(S, 3);
+  r = smfi_chgfrom(ctx, mail, args);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
