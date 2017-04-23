@@ -91,8 +91,7 @@ static int Milter_smfi_version (lua_State *S)
  */
 static SMFICTX *unwrap_envelope (lua_State *S, int top)
 {
-  SMFICTX *ctx;
-  lua_pushliteral("smfictx");
+  lua_pushliteral(S, "smfictx");
   lua_rawget(S, 1);
   return (SMFICTX *)lua_topointer(S, top);
 }
@@ -174,7 +173,20 @@ static int Milter_smfi_setmlreply (lua_State *S)
  */
 static int Milter_smfi_addheader (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  char *headerf, *headerv;
+  int r, n = lua_gettop(S);
+  if (n < 3)
+  {
+    lua_pushliteral(S, "smfi_addheader: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  headerf = (char *)lua_tostring(S, 2);
+  headerv = (char *)lua_tostring(S, 3);
+  r = smfi_addheader(ctx, headerf, headerv);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
