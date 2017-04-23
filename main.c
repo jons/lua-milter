@@ -341,7 +341,17 @@ static int Milter_smfi_replacebody (lua_State *S)
  */
 static int Milter_smfi_progress (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  int r, n = lua_gettop(S);
+  if (n < 1)
+  {
+    lua_pushliteral(S, "smfi_progress: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  r = smfi_progress(ctx);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
@@ -349,7 +359,19 @@ static int Milter_smfi_progress (lua_State *S)
  */
 static int Milter_smfi_quarantine (lua_State *S)
 {
-  return 0;
+  SMFICTX *ctx;
+  char *reason;
+  int r, n = lua_gettop(S);
+  if (n < 2)
+  {
+    lua_pushliteral(S, "smfi_quarantine: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  reason = (char *)lua_tostring(S, 2);
+  r = smfi_quarantine(ctx, reason);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
