@@ -1,5 +1,6 @@
 function negotiate (envelope, f0, f1, f2, f3)
-  print("[" .. envelope.sid .. "] negotiate")
+  major, minor, patch = Milter.version()
+  print("[" .. envelope.sid .. "] negotiate " .. major .. "." .. minor .. "." .. patch)
   r = Milter.setsymlist(envelope, Milter.SMFIM_HELO, "{client_addr}")
   ret = (Milter.MI_SUCCESS == r and "OK" or "failed")
   print("setsymlist: " .. ret)
@@ -26,6 +27,7 @@ function close (envelope)
   print("[" .. envelope.sid .. "] close (" .. envelope.headers .. " headers, " .. envelope.bytes .. " bytes)")
   return Milter.SMFIS_CONTINUE
 end
+
 
 milter = Milter.create()
 milter:setConnection("inet:12345")
