@@ -10,7 +10,8 @@
 #include <pthread.h>
 #include <string.h>
 #include <time.h>
-#include "libmilter/mfapi.h"
+#include <ffi.h>
+#include <libmilter/mfapi.h>
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
@@ -138,7 +139,7 @@ static int Milter_smfi_getsymval (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_getsymval: invalid envelope");
     lua_error(S);
   }
   symname = (char *)lua_tostring(S, 2);
@@ -163,7 +164,7 @@ static int Milter_smfi_setreply (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_setreply: invalid envelope");
     lua_error(S);
   }
   rcode = (char *)lua_tostring(S, 2);
@@ -179,8 +180,49 @@ static int Milter_smfi_setreply (lua_State *S)
  */
 static int Milter_smfi_setmlreply (lua_State *S)
 {
-  // TODO: libffi or va_list or something?
-  return 0;
+  SMFICTX *ctx;
+  long r = MI_FAILURE, i, nargs, n;
+  ffi_cif ci;
+  ffi_type **t_args;
+  void **args, **f_args;
+  n = lua_gettop(S);
+  nargs = n+1;// setmlreply expects an additional NULL at the end
+  if (n < 4)
+  {
+    lua_pushliteral(S, "smfi_setmlreply: missing argument");
+    lua_error(S);
+  }
+  ctx = unwrap_envelope(S, n+1);
+  if (NULL == ctx)
+  {
+    lua_pushliteral(S, "smfi_setmlreply: invalid envelope");
+    lua_error(S);
+  }
+  t_args = malloc(nargs * sizeof(ffi_type *));
+  f_args = malloc(nargs * sizeof(void *));
+  args = malloc(nargs * sizeof(void *));
+  for (i = 0; i < nargs; i++)
+    t_args[i] = &ffi_type_pointer;
+  for (i = 0; i < nargs; i++)
+    f_args[i] = &args[i];
+
+  args[0] = ctx;
+  args[1] = (char *)lua_tostring(S, 2);
+  args[2] = (char *)lua_tostring(S, 3);
+  for (i = 3; i < n; i++)
+    args[i] = (char *)lua_tostring(S, i+1);
+  args[n] = NULL;
+
+  if (FFI_OK == ffi_prep_cif(&ci, FFI_DEFAULT_ABI, nargs, &ffi_type_sint, t_args))
+    ffi_call(&ci, FFI_FN(smfi_setmlreply), &r, f_args);
+  else
+    fprintf(stderr, "smfi_setmlreply: ffi_prep_cif failed\n");
+
+  free(t_args);
+  free(f_args);
+  free(args);
+  lua_pushinteger(S, r);
+  return 1;
 }
 
 
@@ -199,7 +241,7 @@ static int Milter_smfi_addheader (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_addheader: invalid envelope");
     lua_error(S);
   }
   headerf = (char *)lua_tostring(S, 2);
@@ -225,7 +267,7 @@ static int Milter_smfi_chgheader (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_chgheader: invalid envelope");
     lua_error(S);
   }
   headerf = (char *)lua_tostring(S, 2);
@@ -252,7 +294,7 @@ static int Milter_smfi_insheader (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_insheader: invalid envelope");
     lua_error(S);
   }
   hdridx = lua_tointeger(S, 2);
@@ -279,7 +321,7 @@ static int Milter_smfi_chgfrom (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_chgfrom: invalid envelope");
     lua_error(S);
   }
   mail = (char *)lua_tostring(S, 2);
@@ -305,7 +347,7 @@ static int Milter_smfi_addrcpt (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_addrcpt: invalid envelope");
     lua_error(S);
   }
   rcpt = (char *)lua_tostring(S, 2);
@@ -330,7 +372,7 @@ static int Milter_smfi_addrcpt_par (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_addrcpt_par: invalid envelope");
     lua_error(S);
   }
   rcpt = (char *)lua_tostring(S, 2);
@@ -356,7 +398,7 @@ static int Milter_smfi_delrcpt (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_delrcpt: invalid envelope");
     lua_error(S);
   }
   rcpt = (char *)lua_tostring(S, 2);
@@ -381,7 +423,7 @@ static int Milter_smfi_replacebody (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_replacebody: invalid envelope");
     lua_error(S);
   }
   body = (unsigned char *)lua_tostring(S, 2);
@@ -406,7 +448,7 @@ static int Milter_smfi_progress (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_progress: invalid envelope");
     lua_error(S);
   }
   r = smfi_progress(ctx);
@@ -430,7 +472,7 @@ static int Milter_smfi_quarantine (lua_State *S)
   ctx = unwrap_envelope(S, n+1);
   if (NULL == ctx)
   {
-    lua_pushliteral(S, "smfi_setsymlist: invalid envelope");
+    lua_pushliteral(S, "smfi_quarantine: invalid envelope");
     lua_error(S);
   }
   reason = (char *)lua_tostring(S, 2);
