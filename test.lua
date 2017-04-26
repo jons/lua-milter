@@ -9,9 +9,9 @@ function negotiate (envelope, f0, f1, f2, f3)
   return Milter.SMFIS_ALL_OPTS
 end
 
-function helo (envelope, addr)
-  --addr = Milter.getsymval(envelope, "{client_addr}")
-  print("[" .. envelope.sid .. "] helo " .. addr)
+function helo (envelope, identity)
+  addr = Milter.getsymval(envelope, "{client_addr}")
+  print("[" .. envelope.sid .. "] helo " .. addr .. "\"" .. identity .. "\"")
   return Milter.SMFIS_CONTINUE
   -- example multiline reply enabled by libffi:
   --r = Milter.setmlreply(envelope, "421", "4.4.5", "We're up to something here...", "Come back later.")
@@ -22,14 +22,17 @@ end
 
 function header (envelope, name, value)
   envelope.headers = envelope.headers + 1
+  return Milter.SMFIS_CONTINUE
 end
 
 function data (envelope, segment, len)
   envelope.bytes = envelope.bytes + len
+  return Milter.SMFIS_CONTINUE
 end
 
 function abort (envelope)
   print("[" .. envelope.sid .. "] abort")
+  return Milter.SMFIS_CONTINUE
 end
 
 function close (envelope)

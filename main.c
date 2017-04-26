@@ -1013,69 +1013,71 @@ sfsistat fi_negotiate (SMFICTX *context,
 {
   unsigned short sid = rand();
   char ssid[8] = {'\0'};
-  int r = SMFIS_ALL_OPTS;
+
   envelope_t *envelope = (envelope_t *)malloc(sizeof(envelope_t));
-  memset(envelope, 0, sizeof(envelope_t));
-  smfi_setpriv(context, envelope);
   if (NULL == envelope)
   {
-    fprintf(stderr, "smfi_negotiate: failed to allocate envelope, continuing\n");
+    fprintf(stderr, "smfi_negotiate: failed to allocate envelope. skipping session\n");
+    return SMFIS_REJECT;
   }
-  else if (pthread_mutex_lock(&lock_L))
-  {
-    fprintf(stderr, "smfi_negotiate: lua_State lock failed, continuing\n");
-  }
-  else
-  {
-    // negotiate is the first event of a new mail session and only fires once
-    // so we create a lua thread here that will service all of its events
-    envelope->T = lua_newthread(L);
-    envelope->Tref = luaL_ref(L, LUA_REGISTRYINDEX);
-    //lua_pop(L, 1);
-    //f = L_refs[EH_NEGOTIATE];
-    pthread_mutex_unlock(&lock_L);
 
-    // before firing the event, create the envelope for this session
-    lua_newtable(envelope->T);
-    lua_pushliteral(envelope->T, "smfictx");
-    lua_pushlightuserdata(envelope->T, context);
-    lua_rawset(envelope->T, -3);
-    sprinth(ssid, 8, (char *)&sid, sizeof(sid));
-    lua_pushliteral(envelope->T, "sid");
-    lua_pushstring(envelope->T, ssid);
-    lua_rawset(envelope->T, -3);
-    envelope->Eref = luaL_ref(envelope->T, LUA_REGISTRYINDEX);
-
-    r = fire(envelope->T, EH_NEGOTIATE, envelope->Eref, f0, f1, f2, f3);
+  if (pthread_mutex_lock(&lock_L))
+  {
+    fprintf(stderr, "smfi_negotiate: lua_State lock failed. skipping session\n");
+    return SMFIS_REJECT;
   }
-  return r;
+  memset(envelope, 0, sizeof(envelope_t));
+  smfi_setpriv(context, envelope);
+
+  // negotiate is the first event of a new mail session and only fires once
+  // so we create a lua thread here that will service all of its events
+  envelope->T = lua_newthread(L);
+  envelope->Tref = luaL_ref(L, LUA_REGISTRYINDEX);
+  //lua_pop(L, 1);
+  //f = L_refs[EH_NEGOTIATE];
+  pthread_mutex_unlock(&lock_L);
+
+  // before firing the event, create the envelope for this session
+  lua_newtable(envelope->T);
+  lua_pushliteral(envelope->T, "smfictx");
+  lua_pushlightuserdata(envelope->T, context);
+  lua_rawset(envelope->T, -3);
+  sprinth(ssid, 8, (char *)&sid, sizeof(sid));
+  lua_pushliteral(envelope->T, "sid");
+  lua_pushstring(envelope->T, ssid);
+  lua_rawset(envelope->T, -3);
+  envelope->Eref = luaL_ref(envelope->T, LUA_REGISTRYINDEX);
+
+  // TODO: honor lua return code
+  fire(envelope->T, EH_NEGOTIATE, envelope->Eref, f0, f1, f2, f3);
+  return SMFIS_ALL_OPTS;
 }
 
 
 sfsistat fi_connect (SMFICTX *context, char *host, _SOCK_ADDR *sa)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_CONNECT, envelope->Eref, host);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_CONNECT, envelope->Eref, host);
 }
 
 
 sfsistat fi_unknown (SMFICTX *context, const char *command)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_UNKNOWN, envelope->Eref, command);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_UNKNOWN, envelope->Eref, command);
 }
 
 
 sfsistat fi_helo (SMFICTX *context, char *helo)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_HELO, envelope->Eref, helo);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_HELO, envelope->Eref, helo);
 }
 
 
@@ -1083,6 +1085,8 @@ sfsistat fi_envfrom (SMFICTX *context, char **argv)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   int r = SMFIS_CONTINUE;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
   r = fire(envelope->T, EH_ENVFROM, envelope->Eref);
   return r;
 }
@@ -1091,89 +1095,91 @@ sfsistat fi_envfrom (SMFICTX *context, char **argv)
 sfsistat fi_envrcpt (SMFICTX *context, char **argv)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_ENVRCPT, envelope->Eref);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_ENVRCPT, envelope->Eref);
 }
 
 
 sfsistat fi_data (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_DATA, envelope->Eref);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_DATA, envelope->Eref);
 }
 
 
 sfsistat fi_header (SMFICTX *context, char *name, char *value)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_HEADER, envelope->Eref, name, value);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_HEADER, envelope->Eref, name, value);
 }
 
 
 sfsistat fi_eoh (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_EOH, envelope->Eref);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_EOH, envelope->Eref);
 }
 
 
 sfsistat fi_body (SMFICTX *context, unsigned char *segment, size_t len)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_BODY, envelope->Eref, segment, len);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_BODY, envelope->Eref, segment, len);
 }
 
 
 sfsistat fi_eom (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_EOM, envelope->Eref);
-  return r;
+  if (NULL == envelope)
+    return SMFIS_TEMPFAIL;
+  return fire(envelope->T, EH_EOM, envelope->Eref);
 }
 
 
 sfsistat fi_abort (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
-  r = fire(envelope->T, EH_ABORT, envelope->Eref);
-  return r;
+  if (NULL != envelope)
+    return fire(envelope->T, EH_ABORT, envelope->Eref);
+  return SMFIS_CONTINUE;
 }
 
 
 sfsistat fi_close (SMFICTX *context)
 {
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
-  int r = SMFIS_CONTINUE;
+  if (NULL != envelope)
+  {
 /*
-  if (!pthread_mutex_lock(&lock_L))
-  {
-    f = L_refs[EH_CLOSE];
-    pthread_mutex_unlock(&lock_L);
-  }
+    if (!pthread_mutex_lock(&lock_L))
+    {
+      f = L_refs[EH_CLOSE];
+      pthread_mutex_unlock(&lock_L);
+    }
 */
-  r = fire(envelope->T, EH_CLOSE, envelope->Eref);
+    (void)fire(envelope->T, EH_CLOSE, envelope->Eref);
 
-  luaL_unref(envelope->T, LUA_REGISTRYINDEX, envelope->Eref);
+    luaL_unref(envelope->T, LUA_REGISTRYINDEX, envelope->Eref);
 
-  if (!pthread_mutex_lock(&lock_L))
-  {
-    luaL_unref(L, LUA_REGISTRYINDEX, envelope->Tref);
-    pthread_mutex_unlock(&lock_L);
+    if (!pthread_mutex_lock(&lock_L))
+    {
+      luaL_unref(L, LUA_REGISTRYINDEX, envelope->Tref);
+      pthread_mutex_unlock(&lock_L);
+    }
+    free(envelope);
   }
-  free(envelope);
   smfi_setpriv(context, NULL);
-  return r;
+  return SMFIS_CONTINUE;
 }
 
 
