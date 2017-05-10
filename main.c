@@ -952,6 +952,27 @@ int setstack_2s (lua_State *T, va_list ap)
 
 
 /**
+ * use for envfrom, envrcpt
+ */
+int setstack_esmtp (lua_State *T, va_list ap)
+{
+  char **argv = va_arg(ap, char **);
+  int i;
+
+  lua_pushstring(T, argv[0]);
+  lua_newtable(T);
+  for (i = 1; argv[i]; i++)
+  {
+    fprintf(stderr, "esmtp: %s\n", argv[i]);
+    //lua_pushinteger(T, i-1);
+    //lua_pushstring(T, argv[i]);
+    //lua_rawset(T, -3);
+  }
+  return 2;
+}
+
+
+/**
  */
 int setstack_body (lua_State *T, va_list ap)
 {
@@ -1087,7 +1108,7 @@ sfsistat fi_envfrom (SMFICTX *context, char **argv)
   int r = SMFIS_CONTINUE;
   if (NULL == envelope)
     return SMFIS_TEMPFAIL;
-  r = fire(envelope->T, EH_ENVFROM, envelope->Eref);
+  r = fire(envelope->T, EH_ENVFROM, envelope->Eref, argv);
   return r;
 }
 
@@ -1097,7 +1118,7 @@ sfsistat fi_envrcpt (SMFICTX *context, char **argv)
   envelope_t *envelope = (envelope_t *)smfi_getpriv(context);
   if (NULL == envelope)
     return SMFIS_TEMPFAIL;
-  return fire(envelope->T, EH_ENVRCPT, envelope->Eref);
+  return fire(envelope->T, EH_ENVRCPT, envelope->Eref, argv);
 }
 
 
@@ -1194,6 +1215,8 @@ int main (int argc, char **argv)
   SS_funcs[EH_CONNECT]   = setstack_1s;
   SS_funcs[EH_UNKNOWN]   = setstack_1s;
   SS_funcs[EH_HELO]      = setstack_1s;
+  SS_funcs[EH_ENVFROM]   = setstack_esmtp;
+  SS_funcs[EH_ENVRCPT]   = setstack_esmtp;
   SS_funcs[EH_HEADER]    = setstack_2s;
   SS_funcs[EH_BODY]      = setstack_body;
   srand(time(NULL));
